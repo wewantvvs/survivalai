@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Survival AI</title>
+<style>:root{color-scheme:dark;--bg:#0a1020;--p:#121c30;--l:#2a3a56;--t:#edf3ff;--m:#9baecb;--g:#67e2b0;--r:#ff8c9a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.5 system-ui,sans-serif}
+.app{max-width:1100px;margin:auto;padding:20px 14px}.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.p{background:var(--p);border:1px solid var(--l);border-radius:14px;padding:16px;margin-bottom:14px}h2{font-size:15px;margin:0 0 10px}.s{color:var(--m);font-size:12px}
+.m{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.m div{background:#0d172a;border-radius:10px;padding:10px}.m b{display:block;font-size:20px}
+button,input{font:inherit;border-radius:8px;border:1px solid #3a4c6d;background:#1a2b48;color:var(--t);padding:9px 11px;min-height:40px}button{cursor:pointer;font-weight:700}input{background:#0a1426;width:100%}
+.row{display:flex;gap:8px;margin:8px 0}.row>*{flex:1}.r{border-bottom:1px solid #26344d;padding:8px 0;display:flex;justify-content:space-between;gap:8px;font-size:13px}.g{color:var(--g)}.x{color:var(--r)}
+#err{color:var(--r);min-height:20px;font-size:13px}.badge{border:1px solid var(--l);border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800}</style></head><body><div class="app">
+<div id="login" class="p" style="max-width:340px;margin:60px auto"><h2>Survival AI</h2><input id="pw" type="password" placeholder="Admin password"><div class="row"><button id="lb">Sign in</button></div></div>
+<div id="main" hidden><div class="row" style="align-items:center"><h2 style="flex:3;font-size:22px">Survival AI</h2><span class="badge" id="mode"></span></div><div id="err"></div>
+<div class="grid"><div>
+<div class="p"><h2>Money (AUD, real ledger)</h2><div class="m"><div><span class="s">Balance</span><b id="bal"></b></div><div><span class="s">Revenue</span><b class="g" id="rev"></b></div><div><span class="s">Expenses</span><b id="exp"></b></div></div>
+<p class="s" id="cap"></p><div class="row"><button id="go"></button></div><p class="s" id="issue"></p></div>
+<div class="p"><h2>Fund (Stripe Checkout)</h2><div class="row"><input id="da" type="number" min="5" placeholder="Amount AUD"><button id="db">Add funds</button></div>
+<h2 style="margin-top:14px">Withdraw (needs your approval)</h2><div class="row"><input id="wa" type="number" min="1" placeholder="Amount AUD"><button id="wb">Request</button></div><div id="wl"></div></div>
+<div class="p"><h2>Agent proposals (you execute, you approve)</h2><div id="pl"></div></div>
+<div class="p"><h2>Ledger</h2><div id="ll"></div></div></div>
+<div><div class="p"><h2>Memory</h2><div class="row"><input id="mt" placeholder="Teach the agent something"><button id="mb" style="flex:0 0 70px">Add</button></div><div id="ml"></div></div></div></div></div></div>
+<script>
+const $=i=>document.getElementById(i),$$=(h,c)=>{const d=document.createElement('div');d.className=c||'r';d.append(...h);return d},T=(s,c)=>{const e=document.createElement('span');e.textContent=s;if(c)e.className=c;return e},B=(s,f)=>{const b=document.createElement('button');b.textContent=s;b.style.flex='0 0 auto';b.onclick=f;return b};
+const $m=c=>(c/100).toLocaleString('en-AU',{style:'currency',currency:'AUD'});
+async function api(p,m='GET',b){const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:m==='POST'?JSON.stringify(b||{}):undefined});const j=await r.json();if(r.status===401){$('login').hidden=false;$('main').hidden=true}if(!r.ok){$('err').textContent=j.error;throw 0}$('err').textContent='';return j}
+function draw(s){$('login').hidden=true;$('main').hidden=false;$('mode').textContent='STRIPE '+s.stripe;$('bal').textContent=$m(s.balance);$('rev').textContent=$m(s.revenue);$('exp').textContent=$m(s.expenses);
+$('cap').textContent=`Spent last 24h ${$m(s.spentToday)} of ${$m(s.dailyCap)} cap. Agent shuts down at $0.00.`;$('issue').textContent=s.agentIssue||'';$('go').textContent=s.running?'Pause agent':'Start agent';$('go').onclick=()=>api('agent','POST',{running:!s.running}).then(draw);
+const L=(id,a,f)=>{$(id).replaceChildren(...(a.length?a.map(f):[T('Nothing yet','s')]))};
+L('ll',s.ledger,e=>$$([T(e.note||e.type),T(($m(e.cents)),e.type==='deposit'||e.type==='revenue'?'g':'x')]));
+L('ml',s.memory,m=>$$([T(m.text),B('✕',()=>api('memory/'+m.id,'DELETE').then(draw))]));
+L('wl',s.withdrawals,w=>$$([T($m(w.cents)+' · '+w.status+(w.error?' ('+w.error+')':'')),...(w.status==='pending'?[B('Approve',()=>{if(prompt('Type the amount in cents to send real money to your bank: '+w.cents)==w.cents)api(`withdraw/${w.id}/approve`,'POST',{confirm_cents:w.cents}).then(draw)}),B('Reject',()=>api(`withdraw/${w.id}/reject`,'POST').then(draw))]:[])]));
+L('pl',s.proposals,p=>$$([T(p.title+' — '+p.detail+(p.est?` (est ${p.est} AUD)`:'')+' ['+p.status+']'),...(p.status==='pending'?[B('Approve',()=>api(`proposal/${p.id}/approved`,'POST').then(draw)),B('Reject',()=>api(`proposal/${p.id}/rejected`,'POST').then(draw))]:[])]))}
+$('lb').onclick=()=>api('login','POST',{password:$('pw').value}).then(()=>api('state').then(draw));
+$('db').onclick=()=>api('deposit','POST',{amount:$('da').value}).then(j=>location=j.url);
+$('wb').onclick=()=>api('withdraw','POST',{amount:$('wa').value}).then(draw);
+$('mb').onclick=()=>api('memory','POST',{text:$('mt').value}).then(s=>{$('mt').value='';draw(s)});
+api('state').then(draw).catch(()=>{});setInterval(()=>$('main').hidden||api('state').then(draw).catch(()=>{}),15000);
+</script></body></html>

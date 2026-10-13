@@ -1,0 +1,14 @@
+[Unit]
+Description=Survival AI
+After=network.target
+
+[Service]
+User=survival
+WorkingDirectory=/opt/survival-ai
+EnvironmentFile=/opt/survival-ai/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

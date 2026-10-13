@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: survival-ai
+    runtime: node
+    plan: starter
+    buildCommand: echo "no dependencies"
+    startCommand: node server.js
+    healthCheckPath: /
+    disk:
+      name: ledger
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATA_DIR
+        value: /var/data
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5-5
+      - key: PRICE_IN_USD_PER_MTOK
+        sync: false
+      - key: PRICE_OUT_USD_PER_MTOK
+        sync: false
+      - key: USD_TO_AUD
+        sync: false
+      - key: DAILY_CAP_AUD
+        value: 5
